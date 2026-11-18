@@ -336,6 +336,34 @@
     <Compile Include="Tools\ScanHost.cs" />
     <Compile Include="Tools\SecureTransfer.cs" />
     <Compile Include="Config\Serializers\Versioning\SqlDatabaseVersionVerifier.cs" />
+    <Compile Include="MultiUser\ActiveSessionTracker.cs" />
+    <Compile Include="MultiUser\ConnectionTreeAccessFilter.cs" />
+    <Compile Include="MultiUser\MultiUserModels.cs" />
+    <Compile Include="MultiUser\MultiUserRepository.cs" />
+    <Compile Include="MultiUser\MultiUserService.cs" />
+    <Compile Include="MultiUser\MultiUserStartup.cs" />
+    <Compile Include="MultiUser\MultiUserText.cs" />
+    <Compile Include="MultiUser\PasswordHasher.cs" />
+    <Compile Include="MultiUser\UI\FormBuilder.cs" />
+    <Compile Include="MultiUser\UI\MultiUserMenu.cs" />
+    <Compile Include="MultiUser\UI\AccessLogForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MultiUser\UI\ActiveSessionsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MultiUser\UI\ChangePasswordForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MultiUser\UI\LoginForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MultiUser\UI\NodePermissionsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MultiUser\UI\UserManagementForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Tree\AlwaysConfirmYes.cs" />
     <Compile Include="Tree\SelectedConnectionDeletionConfirmer.cs" />
     <Compile Include="Tree\ConnectionTreeDragAndDropHandler.cs" />

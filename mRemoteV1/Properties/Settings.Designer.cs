@@ -2642,6 +2642,30 @@ namespace mRemoteNG {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool MultiUserEnabled {
+            get {
+                return ((bool)(this["MultiUserEnabled"]));
+            }
+            set {
+                this["MultiUserEnabled"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string MultiUserLastUsername {
+            get {
+                return ((string)(this["MultiUserLastUsername"]));
+            }
+            set {
+                this["MultiUserLastUsername"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool LockToolbars {
             get {
                 return ((bool)(this["LockToolbars"]));

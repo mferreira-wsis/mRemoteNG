@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using mRemoteNG.App;
 using mRemoteNG.Connection;
 using mRemoteNG.Container;
+using mRemoteNG.MultiUser;
 using mRemoteNG.Tree.Root;
 
 
@@ -48,10 +49,12 @@ namespace mRemoteNG.UI.Controls
             return GetConnectionIcon(connectionInfo);
         }
 
-        private static string BuildConnectionIconName(string icon, bool connected)
+        private static string BuildConnectionIconName(string icon, bool connected, bool inUseByOthers = false)
         {
             var status = connected ? "Play" : "Default";
-            return $"Connection_{icon}_{status}";
+            return inUseByOthers
+                ? $"Connection_{icon}_{status}_InUse"
+                : $"Connection_{icon}_{status}";
         }
 
         private const string DefaultConnectionIcon = "";
@@ -64,7 +67,8 @@ namespace mRemoteNG.UI.Controls
             }
 
             var connected = connection.OpenConnections.Count > 0;
-            var name = BuildConnectionIconName(connection.Icon, connected);
+            var inUseByOthers = ActiveSessionTracker.Instance.IsInUseByOthers(connection);
+            var name = BuildConnectionIconName(connection.Icon, connected, inUseByOthers);
             if (!ImageList.Images.ContainsKey(name))
             {
                 var image = ConnectionIcon.FromString(connection.Icon);
@@ -73,11 +77,36 @@ namespace mRemoteNG.UI.Controls
                     return DefaultConnectionIcon;
                 }
 
-                ImageList.Images.Add(BuildConnectionIconName(connection.Icon, false), image);
-                ImageList.Images.Add(BuildConnectionIconName(connection.Icon, true), Overlay(image, Resources.ConnectedOverlay));
-
+                var defaultImage = image.ToBitmap();
+                var connectedImage = Overlay(image, Resources.ConnectedOverlay);
+                AddIfMissing(BuildConnectionIconName(connection.Icon, false), defaultImage);
+                AddIfMissing(BuildConnectionIconName(connection.Icon, true), connectedImage);
+                AddIfMissing(BuildConnectionIconName(connection.Icon, false, true), InUseOverlay(defaultImage));
+                AddIfMissing(BuildConnectionIconName(connection.Icon, true, true), InUseOverlay(connectedImage));
             }
             return name;
+        }
+
+        private void AddIfMissing(string key, Image image)
+        {
+            if (!ImageList.Images.ContainsKey(key))
+                ImageList.Images.Add(key, image);
+        }
+
+        /// <summary>
+        /// Adds a red dot in the top right corner: someone else is connected to this server.
+        /// </summary>
+        private static Bitmap InUseOverlay(Image background)
+        {
+            var result = new Bitmap(background);
+            using (var gr = Graphics.FromImage(result))
+            {
+                gr.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                var dot = new Rectangle(result.Width - 8, 0, 7, 7);
+                gr.FillEllipse(Brushes.White, Rectangle.Inflate(dot, 1, 1));
+                gr.FillEllipse(Brushes.Red, dot);
+            }
+            return result;
         }
 
         private static Bitmap Overlay(Icon background, Image foreground)

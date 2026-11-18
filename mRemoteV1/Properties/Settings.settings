@@ -656,6 +656,12 @@
     <Setting Name="SQLReadOnly" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="MultiUserEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="MultiUserLastUsername" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="LockToolbars" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>

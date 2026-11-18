@@ -49,6 +49,8 @@ namespace mRemoteNG.UI.Window
 	        {
 	            ConnectionTree.UseFiltering = Settings.Default.UseFilterSearch;
 	            ApplyFiltering();
+	            if (!Settings.Default.UseFilterSearch)
+	                ConnectionTree.RemoveFilter();
             }
 	    }
 

@@ -3,12 +3,15 @@ using mRemoteNG.App;
 using mRemoteNG.Config.Putty;
 using mRemoteNG.Connection;
 using mRemoteNG.Container;
+using mRemoteNG.Messages;
+using mRemoteNG.MultiUser;
 using mRemoteNG.Tree;
 using mRemoteNG.Tree.Root;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 // ReSharper disable ArrangeAccessorOwnerBody
@@ -21,6 +24,8 @@ namespace mRemoteNG.UI.Controls
         private readonly PuttySessionsManager _puttySessionsManager = PuttySessionsManager.Instance;
 	    private readonly StatusImageList _statusImageList = new StatusImageList();
         private readonly ConnectionTreeSearchTextFilter _connectionTreeSearchTextFilter = new ConnectionTreeSearchTextFilter();
+        private readonly ConnectionTreeAccessFilter _accessFilter = new ConnectionTreeAccessFilter();
+        private bool _searchFilterActive;
         private bool _nodeInEditMode;
         private bool _allowEdit;
         private ConnectionContextMenu _contextMenu;
@@ -63,6 +68,8 @@ namespace mRemoteNG.UI.Controls
         {
             if (disposing)
             {
+                ActiveSessionTracker.Instance.SessionsChanged -= OnActiveSessionsChanged;
+                MultiUserService.PermissionsChanged -= OnPermissionsChanged;
                 components?.Dispose();
                 _statusImageList?.Dispose();
             }
@@ -129,6 +136,9 @@ namespace mRemoteNG.UI.Controls
             ModelDropped += _dragAndDropHandler.HandleEvent_ModelDropped;
             BeforeLabelEdit += OnBeforeLabelEdit;
             AfterLabelEdit += OnAfterLabelEdit;
+            FormatRow += OnFormatRow;
+            ActiveSessionTracker.Instance.SessionsChanged += OnActiveSessionsChanged;
+            MultiUserService.PermissionsChanged += OnPermissionsChanged;
         }
 
 		/// <summary>
@@ -163,6 +173,7 @@ namespace mRemoteNG.UI.Controls
         private void PopulateTreeView(ConnectionTreeModel newModel)
         {
             SetObjects(newModel.RootNodes);
+            RefreshAccessFiltering();
             RegisterModelUpdateHandlers(newModel);
             NodeSearcher = new NodeSearcher(newModel);
             ExecutePostSetupActions();
@@ -355,18 +366,108 @@ namespace mRemoteNG.UI.Controls
         /// <param name="filterText">The text to filter by</param>
         public void ApplyFilter(string filterText)
         {
+            _searchFilterActive = true;
             UseFiltering = true;
             _connectionTreeSearchTextFilter.FilterText = filterText;
-            ModelFilter = _connectionTreeSearchTextFilter;
+            ModelFilter = AccessFilteringRequired
+                ? new CompositeAllModelFilter(_accessFilter, _connectionTreeSearchTextFilter)
+                : (IModelFilter)_connectionTreeSearchTextFilter;
         }
 
         /// <summary>
         /// Removes all item filtering from the connection tree
+        /// (except the hiding of nodes the logged in user is not allowed to access)
         /// </summary>
         public void RemoveFilter()
         {
+            _searchFilterActive = false;
+            if (AccessFilteringRequired)
+            {
+                UseFiltering = true;
+                ModelFilter = _accessFilter;
+                return;
+            }
             UseFiltering = false;
             ResetColumnFiltering();
+        }
+
+        /// <summary>
+        /// True when a user without administrator rights is logged in:
+        /// nodes restricted to groups they don't belong to must be hidden.
+        /// </summary>
+        private static bool AccessFilteringRequired => MultiUserService.IsActive && !MultiUserService.IsAdmin;
+
+        /// <summary>
+        /// Re-applies the user/group access filter, keeping the current search filter (if any).
+        /// </summary>
+        public void RefreshAccessFiltering()
+        {
+            if (!MultiUserService.IsActive) return;
+            if (_searchFilterActive)
+                ApplyFilter(_connectionTreeSearchTextFilter.FilterText);
+            else
+                RemoveFilter();
+        }
+
+        private void OnPermissionsChanged(object sender, EventArgs e)
+        {
+            SafeBeginInvoke(() =>
+            {
+                RefreshAccessFiltering();
+                RefreshVisibleItems();
+            });
+        }
+
+        private void OnActiveSessionsChanged(object sender, EventArgs e)
+        {
+            SafeBeginInvoke(RefreshVisibleItems);
+        }
+
+        private void SafeBeginInvoke(Action action)
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                BeginInvoke(action);
+            }
+            catch (InvalidOperationException)
+            {
+                // handle destroyed while closing
+            }
+        }
+
+        /// <summary>
+        /// Redraws the visible rows so that the icons / colors reflect who is connected where.
+        /// </summary>
+        private void RefreshVisibleItems()
+        {
+            if (IsDisposed || ConnectionTreeModel == null) return;
+            try
+            {
+                var visible = new List<object>();
+                var count = GetItemCount();
+                for (var i = 0; i < count; i++)
+                {
+                    var rowObject = GetItem(i)?.RowObject;
+                    if (rowObject != null) visible.Add(rowObject);
+                }
+                if (visible.Count > 0)
+                    RefreshObjects(visible);
+            }
+            catch (Exception ex)
+            {
+                Runtime.MessageCollector.AddExceptionStackTrace("ConnectionTree.RefreshVisibleItems failed", ex, MessageClass.WarningMsg);
+            }
+        }
+
+        private static readonly Color InUseByOthersColor = Color.OrangeRed;
+
+        private void OnFormatRow(object sender, FormatRowEventArgs e)
+        {
+            var connectionInfo = e.Model as ConnectionInfo;
+            if (connectionInfo == null || connectionInfo is ContainerInfo) return;
+            if (!ActiveSessionTracker.Instance.IsInUseByOthers(connectionInfo)) return;
+            e.Item.ForeColor = InUseByOthersColor;
         }
 
         private void HandleCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
@@ -433,15 +534,21 @@ namespace mRemoteNG.UI.Controls
         {
             try
             {
-                if (!Settings.Default.ShowDescriptionTooltipsInTree)
-                {
-                    // setting text to null prevents the tooltip from being shown
-                    e.Text = null;
-                    return;
-                }
-
                 var nodeProducingTooltip = (ConnectionInfo)e.Model;
-                e.Text = nodeProducingTooltip.Description;
+                var lines = new List<string>();
+
+                var inUse = ActiveSessionTracker.Instance.DescribeSessionsOfOthers(nodeProducingTooltip);
+                if (!string.IsNullOrEmpty(inUse))
+                    lines.Add(inUse);
+
+                if (MultiUserService.IsAdmin && MultiUserService.IsRestricted(nodeProducingTooltip))
+                    lines.Add(string.Format(MultiUserText.RestrictedTo, MultiUserService.GetGroupNames(MultiUserService.GetAssignedGroups(nodeProducingTooltip))));
+
+                if (Settings.Default.ShowDescriptionTooltipsInTree && !string.IsNullOrEmpty(nodeProducingTooltip.Description))
+                    lines.Add(nodeProducingTooltip.Description);
+
+                // setting text to null prevents the tooltip from being shown
+                e.Text = lines.Count > 0 ? string.Join(Environment.NewLine + Environment.NewLine, lines) : null;
             }
             catch (Exception ex)
             {

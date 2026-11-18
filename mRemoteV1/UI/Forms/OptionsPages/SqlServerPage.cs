@@ -3,6 +3,7 @@ using mRemoteNG.App;
 using mRemoteNG.Config.Connections;
 using mRemoteNG.Config.Connections.Multiuser;
 using mRemoteNG.Config.DatabaseConnectors;
+using mRemoteNG.MultiUser;
 using mRemoteNG.Security.SymmetricEncryption;
 
 namespace mRemoteNG.UI.Forms.OptionsPages
@@ -10,10 +11,21 @@ namespace mRemoteNG.UI.Forms.OptionsPages
 	public sealed partial class SqlServerPage
     {
         private readonly SqlDatabaseConnectionTester _databaseConnectionTester;
+        private readonly Controls.Base.NGCheckBox chkMultiUser;
 
         public SqlServerPage()
         {
             InitializeComponent();
+            chkMultiUser = new Controls.Base.NGCheckBox
+            {
+                AutoSize = true,
+                Location = new System.Drawing.Point(23, 310),
+                Name = "chkMultiUser",
+                Text = MultiUserText.OptionsCheckbox,
+                UseVisualStyleBackColor = true,
+                Enabled = false
+            };
+            this.Controls.Add(chkMultiUser);
             ApplyTheme();
             _databaseConnectionTester = new SqlDatabaseConnectionTester();
         }
@@ -51,6 +63,7 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             var cryptographyProvider = new LegacyRijndaelCryptographyProvider();
             txtSQLPassword.Text = cryptographyProvider.Decrypt(Settings.Default.SQLPass, Runtime.EncryptionKey);
             chkSQLReadOnly.Checked = Settings.Default.SQLReadOnly;
+            chkMultiUser.Checked = Settings.Default.MultiUserEnabled;
 	        lblTestConnectionResults.Text = "";
         }
 
@@ -66,6 +79,8 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             var cryptographyProvider = new LegacyRijndaelCryptographyProvider();
             Settings.Default.SQLPass = cryptographyProvider.Encrypt(txtSQLPassword.Text, Runtime.EncryptionKey);
             Settings.Default.SQLReadOnly = chkSQLReadOnly.Checked;
+            // takes effect at the next start of the application (login is required before loading connections)
+            Settings.Default.MultiUserEnabled = chkMultiUser.Checked;
 
             if (Settings.Default.UseSQLServer)
                 ReinitializeSqlUpdater();
@@ -106,6 +121,7 @@ namespace mRemoteNG.UI.Forms.OptionsPages
             txtSQLUsername.Enabled = useSQLServer;
             txtSQLPassword.Enabled = useSQLServer;
             chkSQLReadOnly.Enabled = useSQLServer;
+            chkMultiUser.Enabled = useSQLServer && (!MultiUserService.IsActive || MultiUserService.IsAdmin);
             btnTestConnection.Enabled = useSQLServer;
         }
 

@@ -3,6 +3,7 @@ using mRemoteNG.Connection.Protocol;
 using mRemoteNG.Connection.Protocol.RDP;
 using mRemoteNG.Container;
 using mRemoteNG.Messages;
+using mRemoteNG.MultiUser;
 using mRemoteNG.UI.Forms;
 using mRemoteNG.UI.Panels;
 using mRemoteNG.UI.Window;
@@ -91,6 +92,13 @@ namespace mRemoteNG.Connection
                     return;
                 }
 
+                if (!MultiUserService.CanAccess(connectionInfo))
+                {
+                    Runtime.MessageCollector.AddMessage(MessageClass.WarningMsg, string.Format(MultiUserText.AccessDenied, connectionInfo.Name));
+                    MultiUserService.Log(AccessAction.AccessDenied, connectionInfo);
+                    return;
+                }
+
                 StartPreConnectionExternalApp(connectionInfo);
 
                 if ((force & ConnectionInfo.Force.DoNotJump) != ConnectionInfo.Force.DoNotJump)
@@ -126,6 +134,7 @@ namespace mRemoteNG.Connection
 
                 connectionInfo.OpenConnections.Add(newProtocol);
                 _activeConnections.Add(connectionInfo.ConstantID);
+                ActiveSessionTracker.Instance.RegisterConnection(newProtocol, connectionInfo);
                 FrmMain.Default.SelectedConnection = connectionInfo;
             }
             catch (Exception ex)
@@ -275,6 +284,7 @@ namespace mRemoteNG.Connection
 
                 Runtime.MessageCollector.AddMessage(MessageClass.InformationMsg, string.Format(Language.strConnenctionClosedByUser, connDetail, prot.InterfaceControl.Info.Protocol, Environment.UserName));
                 prot.InterfaceControl.Info.OpenConnections.Remove(prot);
+                ActiveSessionTracker.Instance.UnregisterConnection(prot);
                 if (_activeConnections.Contains(prot.InterfaceControl.Info.ConstantID))
                     _activeConnections.Remove(prot.InterfaceControl.Info.ConstantID);
 

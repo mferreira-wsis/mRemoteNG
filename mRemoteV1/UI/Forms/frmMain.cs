@@ -20,6 +20,8 @@ using mRemoteNG.Config.Settings;
 using mRemoteNG.Connection;
 using mRemoteNG.Messages;
 using mRemoteNG.Messages.MessageWriters;
+using mRemoteNG.MultiUser;
+using mRemoteNG.MultiUser.UI;
 using mRemoteNG.Themes;
 using mRemoteNG.Tools;
 using mRemoteNG.UI.Menu;
@@ -162,6 +164,16 @@ namespace mRemoteNG.UI.Forms
 
             Runtime.ConnectionsService.ConnectionsLoaded += ConnectionsServiceOnConnectionsLoaded;
             Runtime.ConnectionsService.ConnectionsSaved += ConnectionsServiceOnConnectionsSaved;
+
+            // users / groups: the user must log in before the connections are loaded
+            if (!MultiUserStartup.Login(this))
+            {
+                ProgramRoot.CloseSingletonInstanceMutex();
+                Environment.Exit(0);
+                return;
+            }
+            SetupMultiUserMenu();
+
             var credsAndConsSetup = new CredsAndConsSetup();
             credsAndConsSetup.LoadCredsAndCons();
 
@@ -189,6 +201,14 @@ namespace mRemoteNG.UI.Forms
                 if (!panelAdder.DoesPanelExist(panelName))
                     panelAdder.AddPanel(panelName);
             }
+        }
+
+        private void SetupMultiUserMenu()
+        {
+            if (!MultiUserService.IsActive) return;
+            var multiUserMenu = new MultiUserMenu { MainForm = this };
+            msMain.Items.Insert(msMain.Items.IndexOf(helpMenu), multiUserMenu);
+            UpdateWindowTitle();
         }
 
         private void ApplyLanguage()
@@ -356,6 +376,7 @@ namespace mRemoteNG.UI.Forms
 			}
 
             Shutdown.Cleanup(_quickConnectToolStrip, _externalToolsToolStrip, _multiSshToolStrip, this);
+            MultiUserService.Shutdown();
 									
 			IsClosing = true;
 
@@ -559,6 +580,12 @@ namespace mRemoteNG.UI.Forms
 			{
 				titleBuilder.Append(separator);
 				titleBuilder.Append(SelectedConnection.Name);
+			}
+
+			if (MultiUserService.IsActive)
+			{
+				titleBuilder.Append(separator);
+				titleBuilder.Append(string.Format(MultiUserText.LoggedInAs, MultiUserService.CurrentUser.Username));
 			}
 
             Text = titleBuilder.ToString();

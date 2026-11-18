@@ -6,6 +6,8 @@ using mRemoteNG.App;
 using mRemoteNG.Connection;
 using mRemoteNG.Connection.Protocol;
 using mRemoteNG.Container;
+using mRemoteNG.MultiUser;
+using mRemoteNG.MultiUser.UI;
 using mRemoteNG.Tools;
 using mRemoteNG.Tree;
 using mRemoteNG.Tree.Root;
@@ -48,6 +50,8 @@ namespace mRemoteNG.UI.Controls
         private ToolStripMenuItem _cMenTreeImportPortScan;
         private readonly ConnectionTree _connectionTree;
         private readonly IConnectionInitiator _connectionInitiator;
+        private ToolStripSeparator _cMenTreeSepMultiUser;
+        private ToolStripMenuItem _cMenTreePermissions;
 
 
         public ConnectionContextMenu(ConnectionTree connectionTree)
@@ -363,6 +367,19 @@ namespace mRemoteNG.UI.Controls
             _cMenTreeMoveDown.Size = new System.Drawing.Size(199, 22);
             _cMenTreeMoveDown.Text = "Move down";
             _cMenTreeMoveDown.Click += OnMoveDownClicked;
+            // 
+            // users / groups: access permissions (administrators only)
+            // 
+            _cMenTreeSepMultiUser = new ToolStripSeparator { Name = "_cMenTreeSepMultiUser" };
+            _cMenTreePermissions = new ToolStripMenuItem
+            {
+                Name = "_cMenTreePermissions",
+                Size = new System.Drawing.Size(199, 22),
+                Text = MultiUserText.TreeMenuPermissions
+            };
+            _cMenTreePermissions.Click += OnPermissionsClicked;
+            Items.Add(_cMenTreeSepMultiUser);
+            Items.Add(_cMenTreePermissions);
         }
 
         private void ApplyLanguage()
@@ -405,6 +422,7 @@ namespace mRemoteNG.UI.Controls
             {
                 Enabled = true;
                 EnableMenuItemsRecursive(Items);
+                ShowHidePermissionsMenuItem();
                 if (_connectionTree.SelectedNode is RootPuttySessionsNodeInfo)
                 {
                     ShowHideMenuItemsForRootPuttyNode();
@@ -430,6 +448,25 @@ namespace mRemoteNG.UI.Controls
             {
                 Runtime.MessageCollector.AddExceptionStackTrace("ShowHideMenuItems (UI.Controls.ConnectionContextMenu) failed", ex);
             }
+        }
+
+        private void ShowHidePermissionsMenuItem()
+        {
+            var node = _connectionTree.SelectedNode;
+            var visible = MultiUserService.IsAdmin &&
+                          node != null &&
+                          !(node is RootNodeInfo) &&
+                          !(node is PuttySessionInfo);
+            _cMenTreeSepMultiUser.Visible = visible;
+            _cMenTreePermissions.Visible = visible;
+        }
+
+        private void OnPermissionsClicked(object sender, EventArgs e)
+        {
+            var node = _connectionTree.SelectedNode;
+            if (node == null || !MultiUserService.IsAdmin) return;
+            using (var form = new NodePermissionsForm(node))
+                form.ShowDialog(_connectionTree.FindForm());
         }
 
         internal void ShowHideMenuItemsForRootPuttyNode()
