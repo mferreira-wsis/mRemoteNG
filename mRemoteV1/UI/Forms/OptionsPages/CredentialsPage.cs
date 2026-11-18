@@ -9,6 +9,7 @@ namespace mRemoteNG.UI.Forms.OptionsPages
         public CredentialsPage()
         {
             InitializeComponent();
+            PageIcon = Resources.key_Icon;
             ApplyTheme();
         }
 
